@@ -12,7 +12,7 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y valgrind cmake g++
+          sudo apt-get install -y valgrind
           which valgrind
 
       - name: Install auto tools
@@ -41,12 +41,8 @@ jobs:
           ./gitcompile --host=aarch64-linux-gnu
 
       - name: Run memory leak check
-        run: |
-          echo "Verify the compiled binaries"
-          Files=("src/adsprpcd
-            src/cdsprpcd
-            src/sdsprpcd")
-          for File in $Files
-          do 
-           if [ -f $File ] ; then valgrind --leak-check=full ./$File ; else echo $File " - Not Exists" && exit -1 ; fi
-          done
+        uses: LazyPanda07/check-memory-leaks@v1
+        with:
+          path: src
+          name: cdsprpcd
+          #args: "your_executable_arguments"
