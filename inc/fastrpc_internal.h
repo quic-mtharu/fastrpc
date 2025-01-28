@@ -47,7 +47,7 @@
 #define FASTRPC_ASYNC_TYPE_MAX FASTRPC_ASYNC_POLL + 1
 
 /* Max value of remote_dsp_attributes, used to validate the attribute ID*/
-#define FASTRPC_MAX_DSP_ATTRIBUTES STATUS_NOTIFICATION_SUPPORT + 1
+#define FASTRPC_MAX_DSP_ATTRIBUTES MCID_MULTICAST + 1
 
 /* Max value of remote_mem_map_flags, used to validate the input flag */
 #define REMOTE_MAP_MAX_FLAG REMOTE_MAP_MEM_STATIC + 1
@@ -77,11 +77,23 @@ static __inline uint32 Q6_R_cl0_R(uint32 num) {
 /* From actual domain ID (0-3) and session ID, get effective domain ID */
 #define GET_EFFECTIVE_DOMAIN_ID(domain, session) (domain + (NUM_DOMAINS * session))
 
+/* From effective domain ID, get actual domain ID */
+#define GET_DOMAIN_FROM_EFFEC_DOMAIN_ID(effec_dom_id) (effec_dom_id & DOMAIN_ID_MASK)
+
+/* Check if given domain ID is in valid range */
+#define IS_VALID_DOMAIN_ID(domain) ((domain >= 0) && (domain < NUM_DOMAINS))
+
 /* Check if given effective domain ID is in valid range */
 #define IS_VALID_EFFECTIVE_DOMAIN_ID(domain) ((domain >= 0) && (domain < NUM_DOMAINS_EXTEND))
 
 /* Check if given effective domain ID is in extended range */
 #define IS_EXTENDED_DOMAIN_ID(domain) ((domain >= NUM_DOMAINS) && (domain < NUM_DOMAINS_EXTEND))
+
+/* Loop thru list of all domain ids */
+#define FOR_EACH_DOMAIN_ID(i) for(i = 0; i < NUM_DOMAINS; i++)
+
+/* Loop thru list of all effective domain ids */
+#define FOR_EACH_EFFECTIVE_DOMAIN_ID(i) for(i = 0; i < NUM_DOMAINS_EXTEND; i++)
 
 /**
  * @brief  PD initialization types used to create different kinds of PD
@@ -342,7 +354,7 @@ struct handle_list {
 	/* Mutex to synchronize ASync init and deinit */
 	pthread_mutex_t async_init_deinit_mut;
 	uint32_t pd_initmem_size;  /** Initial memory allocated for remote userPD */
-	uint32_t open_handle_count;           // Number of open handles
+	uint32_t refs;       // Number of multi-domain handles + contexts on session
 	bool is_session_reserved;   /** Set if session is reserved or used */
 	/* buffer shared with DSP containing initial config parameters */
 	void *proc_sharedbuf;
@@ -547,6 +559,24 @@ int ioctl_signal_cancel_wait(int dev, uint32_t signal);
 int ioctl_sharedbuf(int dev, struct fastrpc_proc_sharedbuf_info *sharedbuf_info);
 int ioctl_session_info(int dev, struct fastrpc_proc_sess_info *sess_info);
 int ioctl_optimization(int dev, uint32_t max_concurrency);
+
+/*
+ * Manage multi-domain context in kernel (register / remove)
+ *
+ * @param[in]     dev            : device for ioctl call
+ * @param[in]     req            : type of context manage request
+ * @param[in]     user_ctx       : context generated in user
+ * @param[in]     domain_ids     : list of domains in context
+ * @param[in]     num_domain_ids : number of domains
+ * @param[in/out] ctx            : kernel-generated context id. Output ptr
+ *                                 for setup req and input value for
+ *                                 remove request.
+ *
+ * returns 0 on success
+ */
+int ioctl_mdctx_manage(int dev, int req, void *user_ctx,
+	unsigned int *domain_ids, unsigned int num_domain_ids, uint64_t *ctx);
+
 const char* get_secure_domain_name(int domain_id);
 int is_async_fastrpc_supported(void);
 

@@ -32,18 +32,19 @@
 #include "rpcmem.h"
 #include "shared.h"
 #include "verify.h"
+#include "fastrpc_hash_table.h"
 
-struct listener {
+typedef struct {
   pthread_t thread;
   int eventfd;
   int update_requested;
   int params_updated;
   sem_t *r_sem;
-  int domain;
   remote_handle64 adsp_listener1_handle;
-};
+  ADD_DOMAIN_HASH();
+} listener_config;
 
-static struct listener linfo[NUM_DOMAINS_EXTEND];
+DECLARE_HASH_TABLE(listener, listener_config);
 
 extern void set_thread_context(int domain);
 
@@ -107,7 +108,7 @@ static __inline void *rpcmem_realloc(int heapid, uint32 flags, void *buf,
 #define MIN_BUF_SIZE 0x1000
 #define ALIGNB(sz) ((sz) == 0 ? MIN_BUF_SIZE : _SBUF_ALIGN((sz), MIN_BUF_SIZE))
 
-static void listener(struct listener *me) {
+static void listener(listener_config *me) {
   int nErr = AEE_SUCCESS, i = 0, domain = me->domain, ref = 0;
   adsp_listener1_invoke_ctx ctx = 0;
   uint8 *outBufs = 0;
@@ -334,7 +335,7 @@ PL_DEP(apps_std);
 
 static void *listener_start_thread(void *arg) {
   int nErr = AEE_SUCCESS;
-  struct listener *me = (struct listener *)arg;
+  listener_config *me = (listener_config *)arg;
   int domain = me->domain;
   remote_handle64 adsp_listener1_handle = INVALID_HANDLE;
 
@@ -345,14 +346,16 @@ static void *listener_start_thread(void *arg) {
   set_thread_context(domain);
   if ((adsp_listener1_handle = get_adsp_listener1_handle(domain)) != INVALID_HANDLE) {
     nErr = __QAIC_HEADER(adsp_listener1_init2)(adsp_listener1_handle);
-    if (nErr == DSP_AEE_EOFFSET + AEE_ENOSUCHMOD) {
+    if ((nErr == DSP_AEE_EOFFSET + AEE_ERPC) ||
+        nErr == DSP_AEE_EOFFSET + AEE_ENOSUCHMOD) {
       FARF(ERROR, "Error 0x%x: %s domains support not available in listener",
            nErr, __func__);
       fastrpc_update_module_list(DOMAIN_LIST_DEQUEUE, domain, _const_adsp_listener1_handle, NULL, NULL);
       adsp_listener1_handle = INVALID_HANDLE;
       VERIFY(AEE_SUCCESS == (nErr = __QAIC_HEADER(adsp_listener_init2)()));
-    } else if (nErr == AEE_SUCCESS)
+    } else if (nErr == AEE_SUCCESS) {
       me->adsp_listener1_handle = adsp_listener1_handle;
+    }
   } else {
     VERIFY(AEE_SUCCESS == (nErr = __QAIC_HEADER(adsp_listener_init2)()));
   }
@@ -375,17 +378,15 @@ bail:
 }
 
 void listener_android_deinit(void) {
+  HASH_TABLE_CLEANUP(listener_config);
   PL_DEINIT(mod_table);
   PL_DEINIT(apps_std);
 }
 
 int listener_android_init(void) {
   int nErr = 0;
-  int i;
 
-  // initializing all event fd's
-  for (i = 0; i < NUM_DOMAINS_EXTEND; i++)
-    linfo[i].eventfd = -1;
+  HASH_TABLE_INIT(listener_config);
 
   VERIFY(AEE_SUCCESS == (nErr = PL_INIT(mod_table)));
   VERIFY(AEE_SUCCESS == (nErr = PL_INIT(apps_std)));
@@ -406,7 +407,11 @@ bail:
 }
 
 void listener_android_domain_deinit(int domain) {
-  struct listener *me = &linfo[domain];
+  listener_config *me = NULL;
+
+  GET_HASH_NODE(listener_config, domain, me);
+  if (!me)
+    return;
 
   FARF(RUNTIME_RPC_HIGH, "fastrpc listener joining to exit");
   if (me->thread) {
@@ -425,9 +430,14 @@ void listener_android_domain_deinit(int domain) {
 
 int listener_android_domain_init(int domain, int update_requested,
                                  sem_t *r_sem) {
-  struct listener *me = &linfo[domain];
+  listener_config *me = NULL;
   int nErr = AEE_SUCCESS;
 
+  GET_HASH_NODE(listener_config, domain, me);
+  if (!me) {
+    ALLOC_AND_ADD_NEW_NODE_TO_TABLE(listener_config, domain, me);
+  }
+  me->eventfd = -1;
   VERIFYC(-1 != (me->eventfd = eventfd(0, 0)), AEE_EBADPARM);
   FARF(RUNTIME_RPC_HIGH, "Opened Listener event_fd %d for domain %d\n",
        me->eventfd, domain);
@@ -449,7 +459,6 @@ int listener_android_domain_init(int domain, int update_requested,
     sem_wait(me->r_sem);
     VERIFY(AEE_SUCCESS == (nErr = me->params_updated));
   }
-
 bail:
   if (nErr != AEE_SUCCESS) {
     VERIFY_EPRINTF("Error 0x%x: %s failed for domain %d\n", nErr, __func__,
@@ -465,9 +474,11 @@ int close_reverse_handle(remote_handle64 h, char *dlerr, int dlerrorLen,
 }
 
 int listener_android_geteventfd(int domain, int *fd) {
-  struct listener *me = &linfo[domain];
+  listener_config *me = NULL;
   int nErr = 0;
 
+  GET_HASH_NODE(listener_config, domain, me);
+  VERIFYC(me, AEE_ERESOURCENOTFOUND);
   VERIFYC(-1 != me->eventfd, AEE_EBADPARM);
   *fd = me->eventfd;
 bail:
