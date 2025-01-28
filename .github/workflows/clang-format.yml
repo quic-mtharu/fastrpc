@@ -31,7 +31,7 @@ jobs:
         
       - name: Run Clang Format
         run: |
-          find . -name '*.cpp' -o -name '*.h' -o -name '*.c' | xargs clang-format -i 
+          find . -name '*.cpp' -o -name '*.h' -o -name '*.c' | xargs clang-format -i -style='{SortIncludes: false}'
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
