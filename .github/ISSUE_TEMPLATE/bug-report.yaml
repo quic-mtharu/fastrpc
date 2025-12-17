@@ -1,0 +1,67 @@
+name: Bug Report
+description: File a bug report.
+labels: ["Bug"]
+assignees:
+  - ekanshibu
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: input
+    id: fastrpc-ver
+    attributes:
+      label: FastRPC version
+      description: Which release (or git commit) of the library can you
+                   reproduce the issue on?
+      placeholder: v1.0.1
+    validations:
+      required: true
+  - type: input
+    id: dsp-fw-ver
+    attributes:
+      label: DSP firmware version
+      description: "What is the DSP firmware version you're running? (hint:
+                   strings dsp.mbn | grep QC_IMAGE)"
+      placeholder: ADSP.VT.5.4.1-00123-XYZ-1
+    validations:
+      required: true
+  - type: input
+    id: device-info
+    attributes:
+      label: SoC and device name
+      description: What SoC and device can you reproduce this issue on?
+      placeholder: Qualcomm SC8280XP CRD
+    validations:
+      required: true
+  - type: input
+    id: kernel-ver
+    attributes:
+      label: Kernel version
+      description: What kernel version are you running?
+      placeholder: v6.19-rc1
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-repro
+    attributes:
+      label: Steps to reproduce
+      description: Please include all relevant details
+      placeholder: Run xyz --foo=bar
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be
+                   automatically formatted into code, so no need for backticks.
+      render: shell
