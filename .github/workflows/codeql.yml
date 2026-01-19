@@ -77,7 +77,8 @@ jobs:
           automake autoconf libtool pkg-config \
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu\
           libyaml-dev \
-          libyaml-0-2:arm64 libyaml-dev:arm64
+          libyaml-0-2:arm64 libyaml-dev:arm64 \
+          libbsd-dev:arm64
     
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
