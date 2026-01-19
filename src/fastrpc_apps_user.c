@@ -2294,6 +2294,11 @@ int remote_handle_control_domain(int domain, remote_handle64 h, uint32_t req,
       fastrpc_set_qos_latency(domain, h, FASTRPC_QOS_MAX_LATENCY_USEC);
       break;
     }
+    case RPC_PM_QOS: {
+      FARF(ALWAYS, "Warning: PM QoS is not supported; ignoring request and returning "
+           "success for backward compatibility");
+      break;
+    }
     case RPC_ADAPTIVE_QOS: {
       /* Enable adaptive QoS */
       VERIFY(AEE_SUCCESS ==
