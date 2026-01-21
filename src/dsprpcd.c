@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <getopt.h>
 
 #ifndef ADSP_LISTENER_VERSIONED
 #define ADSP_LISTENER_VERSIONED   "libadsp_default_listener.so.1"
@@ -33,6 +34,64 @@
 #endif
 
 typedef int (*dsp_default_listener_start_t)(int argc, char *argv[]);
+
+/**
+ * Prints help information about the daemon.
+ * @param program_name The name of the program
+ * @param dsp_name The DSP name (ADSP, CDSP, etc.)
+ */
+static void print_help(const char *program_name, const char *dsp_name) {
+  printf("Usage: %s [OPTION]...\n", program_name);
+  printf("Daemon that establishes a connection to %s.\n", dsp_name);
+#ifdef USE_ADSP
+  printf("If audiopd is passed as an argument to this daemon, it will connect to audio PD on %s.\n", dsp_name);
+#endif
+  printf("If no argument is provided or rootpd is passed, it will connect to root PD on %s.\n\n", dsp_name);
+
+  printf("Functionality:\n");
+#ifdef USE_ADSP
+  printf("  rootpd:\n");
+  printf("    - Exception logging: Facilitates transfer of %s process exception logs\n", dsp_name);
+  printf("      to the HLOS (High-Level Operating System) logging infrastructure for\n");
+  printf("      effective monitoring and debugging\n");
+  printf("    - Remote file system access\n");
+  printf("  audiopd:\n");
+  printf("    - Memory requirements for audio PD dynamic loading\n");
+  printf("    - Remote file system access\n\n");
+#elif defined(USE_SDSP)
+  printf("  rootpd:\n");
+  printf("    - Remote file system access\n\n");
+#else
+  printf("  rootpd:\n");
+  printf("    - Exception logging: Facilitates transfer of %s process exception logs\n", dsp_name);
+  printf("      to the HLOS (High-Level Operating System) logging infrastructure for\n");
+  printf("      effective monitoring and debugging\n");
+  printf("    - Remote file system access\n\n");
+#endif
+
+  printf("Options:\n");
+  printf("  -h, --help              display this help and exit\n");
+  printf("  <pd_name> <domain>      start daemon for specific PD and domain\n");
+#ifdef USE_ADSP
+  printf("                            example: %s rootpd adsp\n", program_name);
+#elif defined(USE_SDSP)
+  printf("                            example: %s rootpd sdsp\n", program_name);
+#elif defined(USE_CDSP)
+  printf("                            example: %s rootpd cdsp (or cdsp1)\n", program_name);
+#elif defined(USE_GDSP)
+  printf("                            example: %s rootpd gdsp0 (or gdsp1)\n", program_name);
+#endif
+#ifndef USE_GDSP
+  printf("  <pd_name>               start daemon for specific PD\n");
+  printf("                            example: %s rootpd\n", program_name);
+  printf("  (no arguments)          start daemon for root PD (default domain)\n\n");
+#else
+  printf("\n");
+#endif
+
+  printf("Note that this daemon runs continuously and automatically restarts on errors.\n");
+  printf("It exits only when the fastRPC device node is not accessible.\n");
+}
 
 // Result struct for dlopen.
 struct dlopen_result {
@@ -93,6 +152,25 @@ int main(int argc, char *argv[]) {
   #else
     goto bail;
   #endif
+
+  // Parse command-line options
+  static struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {0, 0, 0, 0}
+  };
+
+  int opt;
+  while ((opt = getopt_long(argc, argv, "h", long_options, NULL)) != -1) {
+    switch (opt) {
+      case 'h':
+        print_help(argv[0], dsp_name);
+        return 0;
+      default:
+        fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
+        return 1;
+    }
+  }
+
   VERIFY_EPRINTF("%s daemon starting", dsp_name);
   
   while (1) {
