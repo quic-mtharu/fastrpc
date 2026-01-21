@@ -57,10 +57,44 @@ sudo make install
 
 ### Steps to cross-compile the project on Ubuntu
 
-1. **Install the cross compiler and dependencies:**
+1. **Install the cross compiler and required dependencies:**
 
+    Install cross-compilation toolchain:
     ```bash
     sudo apt install g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
+    ```
+
+    Install and build libyaml:
+    ```bash
+    git clone https://github.com/yaml/libyaml.git
+    cd libyaml
+    ./bootstrap
+    ./configure --host=aarch64-linux-gnu
+    make
+    sudo make install
+    cd ..
+    ```
+
+    Install and build libmd:
+    ```bash
+    git clone https://git.hadrons.org/git/libmd.git
+    cd libmd
+    ./autogen
+    ./configure --host=aarch64-linux-gnu
+    make
+    sudo make install
+    cd ..
+    ```
+
+    Install and build libbsd:
+    ```bash
+    git clone https://gitlab.freedesktop.org/libbsd/libbsd.git
+    cd libbsd
+    ./autogen
+    ./configure --host=aarch64-linux-gnu
+    make
+    sudo make install
+    cd ..
     ```
 
 2. **Create softlink files for the compiler, linker, and other tools. Create environment variables as below for the auto tools:**
