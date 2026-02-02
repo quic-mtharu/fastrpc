@@ -7,14 +7,14 @@ name: Nightly Build kernel and upload artifacts
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Runs every Sunday at midnight UTC
+    - cron: '0 0 * * 0'  # Runs at 00:00, only on Sunday UTC
   workflow_dispatch:     # Allows manual trigger
 
 jobs:
   build-and-upload:
-    runs-on:
+    runs-on: 
       group: GHA-fastrpc-Prd-SelfHosted-RG
-      labels: [ self-hosted, fastrpc-prd-u2404-x64-large-od-ephem ] 
+      labels: [ self-hosted, fastrpc-prd-u2404-x64-large-od-ephem ]
     steps:
       # Checkout fastrpc-image repository to get the Dockerfile
       - name: Checkout fastrpc-image repo for Dockerfile
@@ -85,4 +85,5 @@ jobs:
           s3_bucket: qli-prd-fastrpc-gh-artifacts
           local_file: ${{ github.workspace }}/build_output/kobj.tar.gz
           mode: single-upload
+          artifacts: kernel-artifact/kobj.tar.gz 
           deviceTree: false
