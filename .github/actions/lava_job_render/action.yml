@@ -178,6 +178,7 @@ runs:
           -e TARGET_DTB="${{ env.DEVICE_TREE }}" \
           ${{ inputs.docker_image }} \
           sh -c 'export BOOT_METHOD=fastboot && \
+            export TEST_METHOD=generic && \
             export TARGET=${TARGET} && \
             export TARGET_DTB=${TARGET_DTB} && \
             python3 lava_Job_definition_generator.py --localjson ./data/cloudData.json --fastrpc-premerge'
