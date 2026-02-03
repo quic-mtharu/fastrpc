@@ -68,17 +68,17 @@ if ANDROID_CC
 USE_LOG = -llog
 else
 # Add YAML and BSD libs to link flags for non-Android builds
-libadsprpc_la_LIBADD = @YAML_LIBS@ @BSD_LIBS@
-libcdsprpc_la_LIBADD = @YAML_LIBS@ @BSD_LIBS@
-libsdsprpc_la_LIBADD = @YAML_LIBS@ @BSD_LIBS@
-libgdsprpc_la_LIBADD = @YAML_LIBS@ @BSD_LIBS@
+libadsprpc_la_LIBADD = -ldl -lm $(USE_LOG) @YAML_LIBS@ @BSD_LIBS@
+libcdsprpc_la_LIBADD = -ldl -lm $(USE_LOG) @YAML_LIBS@ @BSD_LIBS@
+libsdsprpc_la_LIBADD = -ldl -lm $(USE_LOG) @YAML_LIBS@ @BSD_LIBS@
+libgdsprpc_la_LIBADD = -ldl -lm $(USE_LOG) @YAML_LIBS@ @BSD_LIBS@
 endif
 
 ADSP_CFLAGS = $(LIBDSPRPC_CFLAGS) -DDEFAULT_DOMAIN_ID=0
 
 lib_LTLIBRARIES += libadsprpc.la
 libadsprpc_la_SOURCES = $(LIBDSPRPC_SOURCES)
-libadsprpc_la_LDFLAGS = -ldl -lm $(USE_LOG) -version-number @LT_VERSION_NUMBER@
+libadsprpc_la_LDFLAGS = -version-number @LT_VERSION_NUMBER@
 libadsprpc_la_CFLAGS = $(ADSP_CFLAGS)
 
 lib_LTLIBRARIES += libadsp_default_listener.la
@@ -91,7 +91,7 @@ CDSP_CFLAGS = $(LIBDSPRPC_CFLAGS) -DDEFAULT_DOMAIN_ID=3
 
 lib_LTLIBRARIES += libcdsprpc.la
 libcdsprpc_la_SOURCES = $(LIBDSPRPC_SOURCES)
-libcdsprpc_la_LDFLAGS = -ldl -lm $(USE_LOG) -version-number @LT_VERSION_NUMBER@
+libcdsprpc_la_LDFLAGS = -version-number @LT_VERSION_NUMBER@
 libcdsprpc_la_CFLAGS = $(CDSP_CFLAGS)
 
 lib_LTLIBRARIES += libcdsp_default_listener.la
@@ -104,7 +104,7 @@ SDSP_CFLAGS = $(LIBDSPRPC_CFLAGS) -DDEFAULT_DOMAIN_ID=2
 
 lib_LTLIBRARIES += libsdsprpc.la
 libsdsprpc_la_SOURCES = $(LIBDSPRPC_SOURCES)
-libsdsprpc_la_LDFLAGS = -ldl -lm $(USE_LOG) -version-number @LT_VERSION_NUMBER@
+libsdsprpc_la_LDFLAGS = -version-number @LT_VERSION_NUMBER@
 libsdsprpc_la_CFLAGS = $(SDSP_CFLAGS)
 
 lib_LTLIBRARIES += libsdsp_default_listener.la
@@ -116,7 +116,7 @@ libsdsp_default_listener_la_CFLAGS = $(SDSP_CFLAGS) -DUSE_SYSLOG
 GDSP_CFLAGS = $(LIBDSPRPC_CFLAGS) -DDEFAULT_DOMAIN_ID=5
 
 libgdsprpc_la_SOURCES = $(LIBDSPRPC_SOURCES)
-libgdsprpc_la_LDFLAGS = -ldl -lm $(USE_LOG) -version-number @LT_VERSION_NUMBER@
+libgdsprpc_la_LDFLAGS = -version-number @LT_VERSION_NUMBER@
 libgdsprpc_la_CFLAGS = $(GDSP_CFLAGS)
 
 libgdsp_default_listener_la_SOURCES = $(LIBDEFAULT_LISTENER_SOURCES)
