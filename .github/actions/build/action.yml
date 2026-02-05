@@ -40,9 +40,9 @@ runs:
         echo "::endgroup::"
 
     - name: Download Kernel artifact
-      uses: qualcomm-linux-stg/fastrpc/.github/actions/aws_s3_helper@development
+      uses: qualcomm/fastrpc/.github/actions/aws_s3_helper@development
       with:
-        s3_bucket: qli-stg-fastrpc-gh-artifacts
+        s3_bucket: qli-prd-fastrpc-gh-artifacts
         artifacts:  kernel-artifact/kobj.tar.gz 
         deviceTree: false
         download_location: ${{ inputs.workspace_path }}
