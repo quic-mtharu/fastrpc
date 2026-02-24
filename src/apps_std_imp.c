@@ -970,20 +970,6 @@ static int get_dirlist_from_env(const char *envvarname, char **ppDirList) {
       // Append default DSP_SEARCH_PATH to user defined env
       strlcat(envList, dsp_search_path, envListPrependLen);
       envListLen = envListPrependLen;
-    } else if (strncmp(envvarname, ADSP_AVS_PATH,
-                           strlen(ADSP_AVS_PATH)) == 0) {
-      envListPrependLen = envListLen + strlen(ADSP_AVS_CFG_PATH);
-      if (envLenGuess < envListPrependLen) {
-        FREEIF(envListBuf);
-        VERIFYC(envListBuf =
-                    realloc(envListBuf, sizeof(char) * envListPrependLen),
-                AEE_ENOMEMORY);
-        envList = envListBuf;
-        VERIFY(0 == (nErr = apps_std_getenv(envvarname, envList,
-                                            envListPrependLen, &listLen)));
-      }
-      strlcat(envList, ADSP_AVS_CFG_PATH, envListPrependLen);
-      envListLen = envListPrependLen;
     }
   } else if (strncmp(envvarname, ADSP_LIBRARY_PATH,
                          strlen(ADSP_LIBRARY_PATH)) == 0 ||
@@ -991,10 +977,6 @@ static int get_dirlist_from_env(const char *envvarname, char **ppDirList) {
                          strlen(DSP_LIBRARY_PATH)) == 0) {
     envListLen = listLen =
         1 + strlcpy(envListBuf, dsp_search_path, envLenGuess);
-  } else if (strncmp(envvarname, ADSP_AVS_PATH,
-                         strlen(ADSP_AVS_PATH)) == 0) {
-    envListLen = listLen =
-        1 + strlcpy(envListBuf, ADSP_AVS_CFG_PATH, envLenGuess);
   }
 
   /*
