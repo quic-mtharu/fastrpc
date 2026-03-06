@@ -440,51 +440,37 @@ int fdlist_fd_from_buf(void *buf, int bufLen, int *nova, void **base, int *attr,
   return 0;
 }
 
-int fastrpc_mmap(int domain, int fd, void *vaddr, int offset, size_t length,
-                 enum fastrpc_map_flags flags) {
+/**
+ * Helper function to perform complete mmap operation including error handling
+ * Returns 0 on success, error code on failure
+ * On success, vaddrout contains the DSP virtual address
+ */
+static int fastrpc_mmap_helper(int *domain, int fd, void *vaddr, int offset,
+                                size_t length, uint32_t flags, int attrs,
+                                uint64_t *vaddrout) {
   struct fastrpc_map map = {0};
-  int nErr = 0, dev = -1, iocErr = 0, attrs = 0, ref = 0;
-  uint64_t vaddrout = 0;
+  int nErr = 0, dev = -1, iocErr = 0, ref = 0;
   struct static_map *mNode = NULL, *tNode = NULL;
   QNode *pn, *pnn;
 
-  VERIFY(AEE_SUCCESS == (nErr = fastrpc_init_once()));
-
-  FARF(RUNTIME_RPC_HIGH,
-       "%s: domain %d fd %d addr %p length 0x%zx flags 0x%x offset 0x%x",
-       __func__, domain, fd, vaddr, length, flags, offset);
-
-  /**
-   * Mask is applied on "flags" parameter to extract map control flags
-   * and SMMU mapping control attributes. Currently no attributes are
-   * suppported. It allows future extension of the fastrpc_mmap API
-   * for SMMU mapping control attributes.
-   */
-  attrs = flags & (~FASTRPC_MAP_FLAGS_MASK);
-  flags = flags & FASTRPC_MAP_FLAGS_MASK;
-  VERIFYC(fd >= 0 && offset == 0 && attrs == 0, AEE_EBADPARM);
-  VERIFYC(flags >= 0 && flags < FASTRPC_MAP_MAX &&
-              flags != FASTRPC_MAP_RESERVED,
-          AEE_EBADPARM);
-
   // Get domain and open session if not already open
-  if (domain == -1) {
-    domain = get_current_domain();
+  if (*domain == -1) {
+    *domain = get_current_domain();
   }
-  VERIFYC(IS_VALID_EFFECTIVE_DOMAIN_ID(domain), AEE_EBADPARM);
-  FASTRPC_GET_REF(domain);
-  VERIFY(AEE_SUCCESS == (nErr = fastrpc_session_dev(domain, &dev)));
+  VERIFYC(IS_VALID_EFFECTIVE_DOMAIN_ID(*domain), AEE_EBADPARM);
+  FASTRPC_GET_REF(*domain);
+  VERIFY(AEE_SUCCESS == (nErr = fastrpc_session_dev(*domain, &dev)));
   VERIFYC(-1 != dev, AEE_ERPC);
 
   /* Search for mapping in current session static map list */
-  pthread_mutex_lock(&smaplst[domain].mut);
-  QLIST_NEXTSAFE_FOR_ALL(&smaplst[domain].ql, pn, pnn) {
+  pthread_mutex_lock(&smaplst[*domain].mut);
+  QLIST_NEXTSAFE_FOR_ALL(&smaplst[*domain].ql, pn, pnn) {
     tNode = STD_RECOVER_REC(struct static_map, qn, pn);
     if (tNode->map.fd == fd) {
       break;
     }
   }
-  pthread_mutex_unlock(&smaplst[domain].mut);
+  pthread_mutex_unlock(&smaplst[*domain].mut);
 
   // Raise error if map found already
   if (tNode) {
@@ -505,13 +491,13 @@ int fastrpc_mmap(int domain, int fd, void *vaddr, int offset, size_t length,
   map.m.vaddrout = 0;
   mNode->map = map.m;
   iocErr = ioctl_mmap(dev, MEM_MAP, flags, attrs, fd, offset, length,
-                      (uint64_t)vaddr, &vaddrout);
+                      (uint64_t)vaddr, vaddrout);
   if (!iocErr) {
-    mNode->map.vaddrout = vaddrout;
+    mNode->map.vaddrout = *vaddrout;
     mNode->refs = 1;
-    pthread_mutex_lock(&smaplst[domain].mut);
-    QList_AppendNode(&smaplst[domain].ql, &mNode->qn);
-    pthread_mutex_unlock(&smaplst[domain].mut);
+    pthread_mutex_lock(&smaplst[*domain].mut);
+    QList_AppendNode(&smaplst[*domain].ql, &mNode->qn);
+    pthread_mutex_unlock(&smaplst[*domain].mut);
     mNode = NULL;
   } else if (errno == ENOTTY ||
              iocErr == (int)(DSP_AEE_EOFFSET | AEE_EUNSUPPORTED)) {
@@ -521,21 +507,57 @@ int fastrpc_mmap(int domain, int fd, void *vaddr, int offset, size_t length,
     nErr = AEE_EFAILED;
     goto bail;
   }
+
 bail:
-  FASTRPC_PUT_REF(domain);
+  FASTRPC_PUT_REF(*domain);
   if (nErr) {
     if (iocErr == 0) {
       errno = 0;
     }
     FARF(ERROR,
-         "Error 0x%x: %s failed to map buffer fd %d, addr %p, length 0x%zx, "
+         "Error 0x%x: %s failed for fd %d, addr %p, length 0x%zx, "
          "domain %d, flags 0x%x, ioctl ret 0x%x, errno %s",
-         nErr, __func__, fd, vaddr, length, domain, flags, iocErr,
+         nErr, __func__, fd, vaddr, length, *domain, flags, iocErr,
          strerror(errno));
   }
   if (mNode) {
     free(mNode);
     mNode = NULL;
+  }
+  return nErr;
+}
+
+int fastrpc_mmap(int domain, int fd, void *vaddr, int offset, size_t length,
+                 enum fastrpc_map_flags flags) {
+  int nErr = 0, attrs = 0;
+  uint64_t vaddrout = 0;
+
+  VERIFY(AEE_SUCCESS == (nErr = fastrpc_init_once()));
+
+  FARF(RUNTIME_RPC_HIGH,
+       "%s: domain %d fd %d addr %p length 0x%zx flags 0x%x offset 0x%x",
+       __func__, domain, fd, vaddr, length, flags, offset);
+
+  /**
+   * Mask is applied on "flags" parameter to extract map control flags
+   * and SMMU mapping control attributes. Currently no attributes are
+   * suppported. It allows future extension of the fastrpc_mmap API
+   * for SMMU mapping control attributes.
+   */
+  attrs = flags & (~FASTRPC_MAP_FLAGS_MASK);
+  flags = flags & FASTRPC_MAP_FLAGS_MASK;
+  VERIFYC(fd >= 0 && offset == 0 && attrs == 0, AEE_EBADPARM);
+  VERIFYC(flags >= 0 && flags < FASTRPC_MAP_MAX &&
+              flags != FASTRPC_MAP_RESERVED,
+          AEE_EBADPARM);
+
+  nErr = fastrpc_mmap_helper(&domain, fd, vaddr, offset, length, flags, attrs,
+                              &vaddrout);
+
+bail:
+  if (nErr) {
+    FARF(ERROR, "Error 0x%x: %s failed for fd %d, addr %p, length 0x%zx, domain %d, flags 0x%x",
+         nErr, __func__, fd, vaddr, length, domain, flags);
   }
   return nErr;
 }
@@ -610,6 +632,104 @@ bail:
          "Error 0x%x: %s failed fd %d, vaddr %p, length 0x%zx, domain %d, "
          "ioctl ret 0x%x, errno %s",
          nErr, __func__, fd, vaddr, length, domain, iocErr, strerror(errno));
+  }
+  return nErr;
+}
+
+int fastrpc_mmap_internal(int domain, int fd, void *vaddr, int offset,
+                           size_t length, uint32_t flags, uint64_t *raddr) {
+  int nErr = 0, attrs = 0;
+
+  VERIFY(AEE_SUCCESS == (nErr = fastrpc_init_once()));
+
+  VERIFYC(raddr != NULL, AEE_EBADPARM);
+
+  FARF(RUNTIME_RPC_HIGH,
+       "%s: domain %d fd %d addr %p length 0x%zx flags 0x%x offset 0x%x",
+       __func__, domain, fd, vaddr, length, flags, offset);
+
+  attrs = flags & (~FASTRPC_MAP_FLAGS_MASK);
+  flags = flags & FASTRPC_MAP_FLAGS_MASK;
+  VERIFYC(fd >= 0 && offset == 0 && attrs == 0, AEE_EBADPARM);
+
+  nErr = fastrpc_mmap_helper(&domain, fd, vaddr, offset, length, flags, attrs,
+                              raddr);
+
+bail:
+  if (nErr) {
+    FARF(ERROR, "Error 0x%x: %s failed for fd %d, addr %p, length 0x%zx, domain %d, flags 0x%x",
+         nErr, __func__, fd, vaddr, length, domain, flags);
+  }
+  return nErr;
+}
+
+int fastrpc_munmap_internal(int domain, uint64_t raddr, size_t length) {
+  int nErr = 0, dev = -1, iocErr = 0, locked = 0, ref = 0;
+  struct static_map *mNode = NULL;
+  QNode *pn, *pnn;
+
+  VERIFY(AEE_SUCCESS == (nErr = fastrpc_init_once()));
+
+  FARF(RUNTIME_RPC_HIGH, "%s: domain %d raddr 0x%llx length 0x%zx", __func__,
+       domain, raddr, length);
+  if (domain == -1) {
+    domain = get_current_domain();
+  }
+  VERIFYC(IS_VALID_EFFECTIVE_DOMAIN_ID(domain), AEE_EBADPARM);
+  FASTRPC_GET_REF(domain);
+  VERIFY(AEE_SUCCESS == (nErr = fastrpc_session_dev(domain, &dev)));
+  /**
+   * Search for mapping in current static map list using DSP virtual address (raddr).
+   */
+  pthread_mutex_lock(&smaplst[domain].mut);
+  locked = 1;
+  QLIST_NEXTSAFE_FOR_ALL(&smaplst[domain].ql, pn, pnn) {
+    mNode = STD_RECOVER_REC(struct static_map, qn, pn);
+    if (mNode->map.vaddrout == raddr) {
+      FARF(RUNTIME_RPC_HIGH, "%s: unmap found for raddr 0x%llx domain %d", __func__,
+           raddr, domain);
+      break;
+    }
+  }
+  VERIFYC(mNode && mNode->map.vaddrout == raddr, AEE_ENOSUCHMAP);
+  if (mNode->refs > 1) {
+    FARF(ERROR, "%s: Attempt to unmap raddr 0x%llx with %d outstanding references",
+         __func__, raddr, mNode->refs - 1);
+    nErr = AEE_EBADPARM;
+    goto bail;
+  }
+  mNode->refs = 0;
+  locked = 0;
+  pthread_mutex_unlock(&smaplst[domain].mut);
+
+  iocErr = ioctl_munmap(dev, MEM_UNMAP, 0, 0, mNode->map.fd, mNode->map.length,
+                        mNode->map.vaddrout);
+  pthread_mutex_lock(&smaplst[domain].mut);
+  locked = 1;
+  if (iocErr == 0) {
+    QNode_DequeueZ(&mNode->qn);
+    free(mNode);
+    mNode = NULL;
+  } else if (errno == ENOTTY || errno == EINVAL) {
+    nErr = AEE_EUNSUPPORTED;
+  } else {
+    mNode->refs = 1;
+    nErr = AEE_EFAILED;
+  }
+bail:
+  if (locked == 1) {
+    locked = 0;
+    pthread_mutex_unlock(&smaplst[domain].mut);
+  }
+  FASTRPC_PUT_REF(domain);
+  if (nErr) {
+    if (iocErr == 0) {
+      errno = 0;
+    }
+    FARF(ERROR,
+         "Error 0x%x: %s failed raddr 0x%llx, length 0x%zx, domain %d, "
+         "ioctl ret 0x%x, errno %s",
+         nErr, __func__, raddr, length, domain, iocErr, strerror(errno));
   }
   return nErr;
 }
