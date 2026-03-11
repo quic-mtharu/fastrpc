@@ -18,7 +18,7 @@ jobs:
     steps:
       # Checkout fastrpc-image repository to get the Dockerfile
       - name: Checkout fastrpc-image repo for Dockerfile
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           repository: qualcomm/fastrpc-image

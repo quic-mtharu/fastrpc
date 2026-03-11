@@ -33,7 +33,7 @@ jobs:
       labels: [ self-hosted, fastrpc-prd-u2404-x64-large-od-ephem ] 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # fetch-depth: 1 is generally sufficient for builds and is faster than 0 (full history).
           # Change to 0 if your build process strictly requires the full Git history.
