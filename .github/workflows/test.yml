@@ -33,7 +33,7 @@ jobs:
         build_matrix: ${{ fromJson(inputs.build_matrix) }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0

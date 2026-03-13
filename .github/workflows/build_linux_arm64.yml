@@ -18,7 +18,7 @@ jobs:
 
     steps:
     - name: Git checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Configure APT for amd64 + arm64 (ports) and update
       shell: bash
