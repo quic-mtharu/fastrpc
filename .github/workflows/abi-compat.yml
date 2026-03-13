@@ -169,7 +169,7 @@ jobs:
         # if: always() ensures reports are uploaded even when ABI check fails
         # - critical for debugging what specific ABI changes caused the failure
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: abi-compat-reports
           path: abi/reports
